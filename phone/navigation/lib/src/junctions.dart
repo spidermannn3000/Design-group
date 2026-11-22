@@ -63,9 +63,13 @@ List<LatLng> junctionsFromOverpass(Map<String, dynamic> json) {
 
 Future<List<LatLng>> fetchJunctions(Polyline line,
     {http.Client? client,
-    String endpoint = 'https://overpass-api.de/api/interpreter'}) async {
+    String endpoint = 'https://overpass-api.de/api/interpreter',
+    Duration timeout = const Duration(seconds: 15)}) async {
   final c = client ?? http.Client();
-  final res = await c.post(Uri.parse(endpoint), body: {'data': overpassQuery(line)});
+  // Time limit so a slow or blocked server can't hold up the start of a ride.
+  final res = await c
+      .post(Uri.parse(endpoint), body: {'data': overpassQuery(line)})
+      .timeout(timeout);
   if (res.statusCode != 200) {
     throw Exception('Overpass error ${res.statusCode}: ${res.body}');
   }
