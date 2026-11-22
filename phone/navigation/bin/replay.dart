@@ -8,6 +8,7 @@
 // --gpx    a recorded track; without it a ride along the route is simulated
 // --mode   always | distance | junction   (default: distance)
 // --noise  simulated GPS noise in metres (default 5)
+// --overpass  Overpass API endpoint (default https://overpass-api.de/api/interpreter)
 import 'dart:convert';
 import 'dart:io';
 
@@ -27,7 +28,13 @@ Future<void> main(List<String> args) async {
   final route = parseOrsGeoJson(
       jsonDecode(File(routePath).readAsStringSync()) as Map<String, dynamic>);
   final mode = TriggerMode.values.byName(opt('mode') ?? 'distance');
-  if (mode == TriggerMode.junction) await addJunctions(route);
+  if (mode == TriggerMode.junction) {
+    final found = await addJunctions(route,
+        endpoint: opt('overpass') ?? 'https://overpass-api.de/api/interpreter');
+    print(found < 0
+        ? 'Junction lookup failed: Level 3 falls back to Level 2'
+        : 'Found $found junctions in the area');
+  }
 
   final gpx = opt('gpx');
   final fixes = gpx != null

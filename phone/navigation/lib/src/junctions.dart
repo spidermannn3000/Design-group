@@ -103,8 +103,17 @@ void attachJunctions(NavRoute route, List<LatLng> junctions,
 /// Fetches and attaches junctions in one step. Pass as
 /// [NavigationSession.prepareRoute]. Failure is not fatal: without junctions
 /// Level 3 falls back to the Level 2 distance trigger.
-Future<void> addJunctions(NavRoute route, {http.Client? client}) async {
+///
+/// Returns the number of junctions found, or -1 if the lookup failed.
+Future<int> addJunctions(NavRoute route,
+    {http.Client? client,
+    String endpoint = 'https://overpass-api.de/api/interpreter'}) async {
   try {
-    attachJunctions(route, await fetchJunctions(route.line, client: client));
-  } catch (_) {}
+    final junctions =
+        await fetchJunctions(route.line, client: client, endpoint: endpoint);
+    attachJunctions(route, junctions);
+    return junctions.length;
+  } catch (_) {
+    return -1;
+  }
 }
