@@ -101,6 +101,51 @@ void main() {
     });
   });
 
+  group('close turns', () {
+    // Left at 400 m, then right only 5 m later (like Parliament Square in
+    // the real Dublin route), then arrive at 600 m.
+    NavRoute doubleTurn() {
+      final start = LatLng(53.34, -6.26);
+      final pts = [
+        start,
+        offsetM(start, northM: 400),
+        offsetM(start, northM: 400, eastM: -5),
+        offsetM(start, northM: 600, eastM: -5),
+      ];
+      final line = Polyline(pts);
+      Manoeuvre m(ManoeuvreKind k, int i) => Manoeuvre(
+          kind: k, instruction: k.name, pointIndex: i, alongM: line.cumulativeM[i]);
+      return NavRoute(line, [
+        m(ManoeuvreKind.left, 1),
+        m(ManoeuvreKind.right, 2),
+        m(ManoeuvreKind.arrive, 3),
+      ]);
+    }
+
+    test('shows both turns as a pair before the first one', () {
+      final route = doubleTurn();
+      final s = NavigationEngine(route).update(pointAlong(route, 320));
+      expect(s.symbols, [LedSymbol.left, LedSymbol.right]);
+      expect(s.then!.kind, ManoeuvreKind.right);
+    });
+
+    test('moves on to the second turn before reaching it', () {
+      final route = doubleTurn();
+      final engine = NavigationEngine(route);
+      engine.update(pointAlong(route, 320));
+      final s = engine.update(pointAlong(route, 403));
+      expect(s.next!.kind, ManoeuvreKind.right);
+      expect(s.symbols, [LedSymbol.right]);
+    });
+
+    test('turns far apart are not paired', () {
+      final route = loadSample();
+      final s = NavigationEngine(route).update(pointAlong(route, 300));
+      expect(s.then, isNull);
+      expect(s.symbols, [LedSymbol.right]);
+    });
+  });
+
   group('N4 level 3 (junctions)', () {
     test('reads junctions (3+ arms) from Overpass data', () {
       final json = {

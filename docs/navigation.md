@@ -10,7 +10,7 @@ Code: `phone/navigation/` is a plain Dart package (no Flutter imports), so it ca
 | N4 | Level 3: show the manoeuvre once the rider passes the last junction before the turn | N3 | `TriggerMode.junction` + `junctions.dart`. Junctions come from OpenStreetMap through the Overpass API. Falls back to Level 2 if there's no junction or no data | Done, live Overpass call not yet tested |
 | N5 | Off-route detection and automatic rerouting | N2 | Off-route = more than 30 m (+ GPS accuracy, capped at 20 m) from the route for 3 fixes in a row. `NavigationSession` then requests a new route from the current position, at most once every 15 s. Matrix shows "rerouting" meanwhile | Done |
 | N6 | Mapping table from provider manoeuvre type to LED symbol ID | N1, F2 | `symbols.dart` and the table below | Done, F2 must use the same IDs |
-| N7 | Test harness that replays a recorded or simulated GPS track | N2 | `bin/replay.dart` (GPX file or simulated noisy ride), plus 17 unit tests | Done |
+| N7 | Test harness that replays a recorded or simulated GPS track | N2 | `bin/replay.dart` (GPX file or simulated noisy ride), plus 20 unit tests | Done |
 
 ## N1: mapping provider comparison
 
@@ -52,12 +52,15 @@ Not shown: depart (11) and exit roundabout (8), because the exit number is alrea
 
 A roundabout is sent as the sequence `[9, 2x]`. For example, 2nd exit = `[9, 22]`. The front module alternates between them (F4).
 
+Two turns 40 m or less apart are sent together. For example, left then right 5 m later = `[2, 3]`. The longest sequence is four IDs (two roundabouts back to back), so F4 should cycle through up to four symbols.
+
 ## How the levels decide when to show a turn
 
 All distances are measured **along the route**: GPS fixes are snapped onto the route line, never measured as a straight line to the turn.
 
 - **Level 1:** the next turn is always shown.
-- **Level 2:** the turn is shown from 110 m before it (100 m + 10 m GPS margin), so GPS error makes it slightly early rather than late. Once shown it stays on, even if GPS jitters backwards. The app moves on to the next turn once the rider is 10 m past this one.
+- **Level 2:** the turn is shown from 110 m before it (100 m + 10 m GPS margin), so GPS error makes it slightly early rather than late. Once shown it stays on, even if GPS jitters backwards. The app moves on to the next turn once the rider is 10 m past this one, or halfway to the next turn if that is closer.
+- **Close turns (any level):** if the next turn is 40 m or less after this one, both are shown together, so the rider knows about the second before reaching the first.
 - **Level 3:** the turn is shown when the rider passes the last side road before it (a road node where 3 or more road arms meet in OpenStreetMap). Driveways, car parks and footpaths don't count. The turn's own junction is ignored. If there's no side road, or Overpass is unreachable, Level 2 is used instead.
 
 ## Testing without riding (N7)
@@ -73,7 +76,7 @@ dart run bin/replay.dart --route my_route.json --gpx my_ride.gpx --mode junction
 
 ## Still to do
 
-- Get an ORS key and make one real Dublin request. Check the manoeuvre types and `exit_number` against our parser.
-- Test the Overpass junction query from a real network (it couldn't be reached from the build machine).
+- ~~Get an ORS key and make one real Dublin request.~~ Done: Trinity College to St Patrick's Cathedral (1.7 km) parsed correctly and is saved as `test/fixtures/dublin_trinity_to_st_patricks.json`. A route with a roundabout is still needed to check `exit_number`.
+- Test the Overpass junction query from a laptop or phone. Both overpass-api.de and overpass.kumi.systems block the cloud build machine. Use `--overpass` on the replay tool to try another server.
 - Record a real ride as GPX and replay it at all three levels to tune the 100 m, 10 m and 30 m values.
 - Agree the symbol IDs with whoever does F2, then copy them into the S4 protocol spec.

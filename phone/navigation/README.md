@@ -58,4 +58,5 @@ Run with `flutter run --dart-define=ORS_API_KEY=your_key`. Never commit the key.
 dart pub get
 dart test
 dart run bin/replay.dart --route test/fixtures/ors_sample.json
+dart run bin/replay.dart --route test/fixtures/dublin_trinity_to_st_patricks.json
 ```
