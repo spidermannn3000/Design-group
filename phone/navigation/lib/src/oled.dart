@@ -254,9 +254,8 @@ void _drawArrow(OledFrame f, double bx, double by, ManoeuvreKind kind, int? exit
       f.thickLine(bx + 34, by + 20, bx + 34, by + 28, r);
       head(34, 40, 180);
     case ManoeuvreKind.roundabout:
-      // Ring with an entry stem from below and an exit off to the top
-      // right (traffic goes clockwise round Irish roundabouts).
-      // A clockwise circular arrow, like a roundabout road sign, with the
+      // A clockwise circular arrow (traffic goes clockwise round Irish
+      // roundabouts), like a roundabout road sign, with the
       // entry from below.
       const cx = 24.0, cy = 25.0, rr = 12.0;
       for (var deg = 200; deg <= 470; deg += 4) {
@@ -307,11 +306,14 @@ void _drawDistance(OledFrame f, double metres) {
 }
 
 /// Rounds the way bike computers do: to 10 m above 100 m, to 0.1 km from 1 km.
+/// Works from whole metres, as sent to the front module, so the phone
+/// preview and the handlebar always agree.
 (String, String) formatDistance(double metres) {
-  if (metres >= 9950) return ('${(metres / 1000).round()}', 'km');
-  if (metres >= 995) return ((metres / 1000).toStringAsFixed(1), 'km');
-  if (metres >= 100) return ('${(metres / 10).round() * 10}', 'm');
-  return ('${metres.round()}', 'm');
+  final m = metres.round();
+  if (m >= 9950) return ('${(m / 1000).round()}', 'km');
+  if (m >= 995) return ((m / 1000).toStringAsFixed(1), 'km');
+  if (m >= 100) return ('${(m / 10).round() * 10}', 'm');
+  return ('$m', 'm');
 }
 
 const Map<String, List<String>> _font = {

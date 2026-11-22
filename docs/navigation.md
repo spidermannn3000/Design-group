@@ -38,7 +38,7 @@ Layout:
 - **Right:** distance to the turn, rounded like a bike computer: `87 m`, `120 m` (to 10 m above 100 m), `2.3 km`.
 - **Flash:** when the turn is **5 m** away or less (measured along the route), the screen inverts 4 times a second until the rider has passed the turn. The firmware does this with the SSD1306 invert command (`display.invertDisplay()` in the Adafruit library), so nothing needs redrawing. With phone GPS error of 5-10 m, the flash can start a few metres early or late.
 
-`phone/navigation/lib/src/oled.dart` draws every screen pixel for pixel (`renderOled`). The phone app previews exactly that. The firmware can either copy the same drawing, or receive the ready-made 1024-byte frame (`OledFrame.toSsd1306()`, the same layout as the Adafruit library's buffer). Choosing between those is part of S4.
+`phone/navigation/lib/src/oled.dart` draws every screen pixel for pixel (`renderOled`), and the phone app previews exactly that. The ESP32 firmware in [`front-module/`](../front-module/README.md) draws the same screens itself from a small Bluetooth message (draft protocol in `protocol.dart`). `front-module/test_native/check.sh` confirms that the two match on 503 screens.
 
 To regenerate the pictures: `dart run tool/oled_preview.dart out_dir` writes every screen as a PBM image.
 

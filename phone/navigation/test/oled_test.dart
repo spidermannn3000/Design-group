@@ -98,6 +98,22 @@ void main() {
     expect(b[7 * 128 + 127], 1 << 7);
   });
 
+  test('Bluetooth packet (draft protocol v1)', () {
+    final s = NavState(
+      next: Manoeuvre(kind: ManoeuvreKind.roundabout, instruction: '', pointIndex: 0, alongM: 0, exitNumber: 2),
+      distanceToNextM: 300.4,
+      showTurn: true,
+      symbols: const [9, 22],
+      offRoute: false,
+      arrived: false,
+      flash: true,
+      alongM: 0,
+      offsetM: 0,
+    );
+    expect(encodeNavPacket(s), [1, 1, 0x2C, 0x01, 2, 9, 22]); // 300 m = 0x012C
+    expect(encodeNavPacket(null), [1, 0, 0xFF, 0xFF, 0]);
+  });
+
   group('flash at 5 m', () {
     final start = LatLng(53.34, -6.26);
     final line = Polyline([start, offsetM(start, northM: 200), offsetM(start, northM: 200, eastM: 100)]);

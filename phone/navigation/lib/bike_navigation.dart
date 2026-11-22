@@ -10,6 +10,7 @@ export 'src/route.dart';
 export 'src/ors_client.dart';
 export 'src/symbols.dart';
 export 'src/oled.dart';
+export 'src/protocol.dart';
 export 'src/engine.dart';
 export 'src/session.dart';
 export 'src/junctions.dart';
