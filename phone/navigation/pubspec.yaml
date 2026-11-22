@@ -1,0 +1,13 @@
+name: bike_navigation
+description: Turn-by-turn cycling navigation logic for the phone app (tasks N1-N7).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  http: ^1.6.0
+
+dev_dependencies:
+  test: ^1.25.0

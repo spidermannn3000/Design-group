@@ -1,0 +1,155 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -6.26,
+      53.34
+     ],
+     [
+      -6.26,
+      53.3404497
+     ],
+     [
+      -6.26,
+      53.3408993
+     ],
+     [
+      -6.26,
+      53.341349
+     ],
+     [
+      -6.26,
+      53.3417986
+     ],
+     [
+      -6.26,
+      53.3422483
+     ],
+     [
+      -6.26,
+      53.342698
+     ],
+     [
+      -6.26,
+      53.3431476
+     ],
+     [
+      -6.26,
+      53.3435973
+     ],
+     [
+      -6.2592468,
+      53.3435973
+     ],
+     [
+      -6.2584936,
+      53.3435973
+     ],
+     [
+      -6.2577405,
+      53.3435973
+     ],
+     [
+      -6.2569873,
+      53.3435973
+     ],
+     [
+      -6.2562341,
+      53.3435973
+     ],
+     [
+      -6.2554809,
+      53.3435973
+     ],
+     [
+      -6.2554809,
+      53.3440469
+     ],
+     [
+      -6.2554809,
+      53.3444966
+     ],
+     [
+      -6.2554809,
+      53.3449463
+     ],
+     [
+      -6.2554809,
+      53.3453959
+     ]
+    ]
+   },
+   "properties": {
+    "segments": [
+     {
+      "distance": 900,
+      "duration": 180,
+      "steps": [
+       {
+        "distance": 400,
+        "duration": 80,
+        "type": 11,
+        "instruction": "Head north on Test Street",
+        "name": "Test Street",
+        "way_points": [
+         0,
+         8
+        ]
+       },
+       {
+        "distance": 300,
+        "duration": 60,
+        "type": 1,
+        "instruction": "Turn right onto East Road",
+        "name": "East Road",
+        "way_points": [
+         8,
+         14
+        ]
+       },
+       {
+        "distance": 200,
+        "duration": 40,
+        "type": 7,
+        "instruction": "Enter the roundabout and take the 2nd exit onto North Avenue",
+        "name": "North Avenue",
+        "exit_number": 2,
+        "way_points": [
+         14,
+         18
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrive at North Avenue, on the left",
+        "name": "-",
+        "way_points": [
+         18,
+         18
+        ]
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "distance": 900,
+     "duration": 180
+    },
+    "way_points": [
+     0,
+     18
+    ]
+   }
+  }
+ ],
+ "metadata": {
+  "note": "Hand-made sample in the shape of an OpenRouteService /v2/directions/cycling-regular/geojson response"
+ }
+}
