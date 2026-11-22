@@ -49,6 +49,10 @@ class NavConfig {
   /// right), so the rider knows about the second before reaching the first.
   final double closeTurnM;
 
+  /// The display flashes when the turn is this close (metres along the
+  /// route), so the rider knows to turn now.
+  final double flashDistanceM;
+
   const NavConfig({
     this.mode = TriggerMode.distance,
     this.triggerDistanceM = 100,
@@ -59,6 +63,7 @@ class NavConfig {
     this.junctionLeadM = 5,
     this.searchAheadM = 400,
     this.closeTurnM = 40,
+    this.flashDistanceM = 5,
   });
 }
 
@@ -83,6 +88,10 @@ class NavState {
   final bool offRoute;
   final bool arrived;
 
+  /// True when the turn is about [NavConfig.flashDistanceM] away or less:
+  /// the display should flash.
+  final bool flash;
+
   /// Rider's progress along the route and distance from it (metres).
   final double alongM;
   final double offsetM;
@@ -95,6 +104,7 @@ class NavState {
     required this.symbols,
     required this.offRoute,
     required this.arrived,
+    this.flash = false,
     required this.alongM,
     required this.offsetM,
   });
@@ -211,6 +221,12 @@ class NavigationEngine {
       symbols: symbols,
       offRoute: offRoute && !_arrived,
       arrived: _arrived,
+      flash: _shown &&
+          !_arrived &&
+          !offRoute &&
+          next != null &&
+          next.kind != ManoeuvreKind.arrive &&
+          distance <= config.flashDistanceM,
       alongM: _alongM,
       offsetM: p.offsetM,
     );

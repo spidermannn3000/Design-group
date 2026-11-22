@@ -5,7 +5,7 @@ The Android app for the bike. It runs **on the phone**. Built with Flutter 3.50.
 What it does now:
 - **Destination entry (P3):** search for a place in Ireland or long-press the map, then see the cycling route, its distance and its time.
 - **Display level:** choose Level 1, 2 or 3 (see `docs/navigation.md`).
-- **Ride screen:** turn-by-turn navigation from GPS, with automatic rerouting. A preview shows exactly what the handlebar LED matrix would show.
+- **Ride screen:** turn-by-turn navigation from GPS, with automatic rerouting. A preview shows exactly what the handlebar OLED screen would show, including the flash when a turn is 5 m away.
 - **Simulate:** rides the route automatically at 4x speed, so you can test indoors.
 
 Navigation logic lives in the separate package `../navigation`. This app only adds the screens, GPS and the map.
@@ -50,7 +50,7 @@ The APK ends up in `build/app/outputs/flutter-apk/app-release.apk`.
 |------|------------|
 | `lib/screens/destination_screen.dart` | Search, route preview, level choice |
 | `lib/screens/ride_screen.dart` | Navigation during a ride |
-| `lib/widgets/led_matrix.dart` | 8x8 symbol pictures (a draft for F2) and the on-screen matrix |
+| `lib/widgets/oled_display.dart` | Pixel-exact preview of the 128x64 handlebar OLED |
 | `lib/widgets/route_map.dart` | Google map with the route |
 | `lib/services/place_search.dart` | Place search (OpenRouteService) |
 | `lib/services/location.dart` | Location permission and GPS stream |

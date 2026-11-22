@@ -1,6 +1,6 @@
 # Navigation, runs on phone (N)
 
-Code: `phone/navigation/` is a plain Dart package (no Flutter imports), so it can be tested on a laptop. The Flutter app imports it, feeds it GPS fixes from `geolocator`, and sends the LED symbol IDs it returns to the front module.
+Code: `phone/navigation/` is a plain Dart package (no Flutter imports), so it can be tested on a laptop. The Flutter app imports it, feeds it GPS fixes from `geolocator`, and sends the display symbol IDs, distance and flash flag it returns to the front module.
 
 | ID | Task | Depends on | Output | Status |
 |----|------|-----------|--------|--------|
@@ -9,8 +9,8 @@ Code: `phone/navigation/` is a plain Dart package (no Flutter imports), so it ca
 | N3 | Level 2: show the manoeuvre within 100 m, measured along the route, allowing 5-10 m GPS error | N2 | `TriggerMode.distance` (default). Shows at 100 m + 10 m GPS margin, stays shown once shown, moves on 10 m after the turn | Done |
 | N4 | Level 3: show the manoeuvre once the rider passes the last junction before the turn | N3 | `TriggerMode.junction` + `junctions.dart`. Junctions come from OpenStreetMap through the Overpass API. Falls back to Level 2 if there's no junction or no data | Done, live Overpass call not yet tested |
 | N5 | Off-route detection and automatic rerouting | N2 | Off-route = more than 30 m (+ GPS accuracy, capped at 20 m) from the route for 3 fixes in a row. `NavigationSession` then requests a new route from the current position, at most once every 15 s. Matrix shows "rerouting" meanwhile | Done |
-| N6 | Mapping table from provider manoeuvre type to LED symbol ID | N1, F2 | `symbols.dart` and the table below | Done, F2 must use the same IDs |
-| N7 | Test harness that replays a recorded or simulated GPS track | N2 | `bin/replay.dart` (GPX file or simulated noisy ride), plus 20 unit tests | Done |
+| N6 | Mapping table from provider manoeuvre type to display symbol ID | N1, F2 | `symbols.dart` and the table below. The display is now a 128x64 OLED; screens are drawn by `oled.dart` | Done, F2 must use the same IDs and layout |
+| N7 | Test harness that replays a recorded or simulated GPS track | N2 | `bin/replay.dart` (GPX file or simulated noisy ride), plus 28 unit tests | Done |
 
 ## N1: mapping provider comparison
 
@@ -26,33 +26,47 @@ Code: `phone/navigation/` is a plain Dart package (no Flutter imports), so it ca
 
 Prices and limits change, so recheck them when signing up. Keep the ORS key out of GitHub (pass it with `--dart-define=ORS_API_KEY=...`, the same approach as the OpenAI key in C1).
 
-## N6: LED symbol IDs
+## Handlebar display (replaces the 8x8 LED matrix)
 
-These IDs go over Bluetooth (S4) and must match the byte arrays in the front module (F2).
+The front module now uses a **0.96" 128x64 OLED** (SSD1306 controller, I2C, usually address `0x3C`). On the yellow/blue version, the top 16 pixel rows are yellow and the rest blue.
 
-| ID | Symbol | Shown for (ORS step type) |
+![All the screens](images/oled_screens.png)
+
+Layout:
+- **Top band (yellow):** what to do, in words, e.g. `SLIGHT LEFT`, `ROUNDABOUT EXIT 2`, `LEFT THEN RIGHT`.
+- **Left (48x48):** the arrow. Its angle shows how sharp the turn is: straight 0°, slight 45°, normal 90°, sharp 135°. U-turns go round to the right (traffic keeps left in Ireland). The roundabout is a clockwise circular arrow with the exit number inside.
+- **Right:** distance to the turn, rounded like a bike computer: `87 m`, `120 m` (to 10 m above 100 m), `2.3 km`.
+- **Flash:** when the turn is **5 m** away or less (measured along the route), the screen inverts 4 times a second until the rider has passed the turn. The firmware does this with the SSD1306 invert command (`display.invertDisplay()` in the Adafruit library), so nothing needs redrawing. With phone GPS error of 5-10 m, the flash can start a few metres early or late.
+
+`phone/navigation/lib/src/oled.dart` draws every screen pixel for pixel (`renderOled`). The phone app previews exactly that. The firmware can either copy the same drawing, or receive the ready-made 1024-byte frame (`OledFrame.toSsd1306()`, the same layout as the Adafruit library's buffer). Choosing between those is part of S4.
+
+To regenerate the pictures: `dart run tool/oled_preview.dart out_dir` writes every screen as a PBM image.
+
+## N6: symbol IDs
+
+These IDs go over Bluetooth (S4). They say which screen to draw. The distance and the flash flag are sent alongside them.
+
+| ID | Screen | Shown for (ORS step type) |
 |----|--------|---------------------------|
 | 0 | Blank | Not navigating |
-| 1 | Straight | Continue (6), and between turns before the trigger point |
-| 2 | Left | Left (0) |
-| 3 | Right | Right (1) |
-| 4 | Slight left | Slight left (4), keep left (12) |
-| 5 | Slight right | Slight right (5), keep right (13) |
-| 6 | Sharp left | Sharp left (2) |
-| 7 | Sharp right | Sharp right (3) |
+| 1 | Straight on | Continue (6), and between turns before the trigger point |
+| 2 | Turn left (90°) | Left (0) |
+| 3 | Turn right (90°) | Right (1) |
+| 4 | Slight left (45°) | Slight left (4), keep left (12) |
+| 5 | Slight right (45°) | Slight right (5), keep right (13) |
+| 6 | Sharp left (135°) | Sharp left (2) |
+| 7 | Sharp right (135°) | Sharp right (3) |
 | 8 | U-turn | U-turn (9) |
-| 9 | Roundabout | Enter roundabout (7), followed by the exit digit |
+| 9 | Roundabout | Enter roundabout (7), followed by the exit number |
 | 10 | Arrival | Goal (10) |
 | 11 | Rerouting | Off-route (N5) |
 | 12 | Bluetooth lost | Set by the front module itself |
 | 13 | Low battery | Set by the module itself |
-| 21-29 | Digits 1-9 | Roundabout exit number |
+| 21-29 | Exit 1-9 | Roundabout exit number |
 
 Not shown: depart (11) and exit roundabout (8), because the exit number is already on the enter-roundabout step.
 
-A roundabout is sent as the sequence `[9, 2x]`. For example, 2nd exit = `[9, 22]`. The front module alternates between them (F4).
-
-Two turns 40 m or less apart are sent together. For example, left then right 5 m later = `[2, 3]`. The longest sequence is four IDs (two roundabouts back to back), so F4 should cycle through up to four symbols.
+A roundabout is sent as `[9, 2x]` (2nd exit = `[9, 22]`). Two turns 40 m or less apart are sent together, e.g. left then right = `[2, 3]`. The screen shows the first arrow with `LEFT THEN RIGHT` in the top band.
 
 ## How the levels decide when to show a turn
 
@@ -79,4 +93,5 @@ dart run bin/replay.dart --route my_route.json --gpx my_ride.gpx --mode junction
 - ~~Get an ORS key and make one real Dublin request.~~ Done: Trinity College to St Patrick's Cathedral (1.7 km) parsed correctly and is saved as `test/fixtures/dublin_trinity_to_st_patricks.json`. A route with a roundabout is still needed to check `exit_number`.
 - Test the Overpass junction query from a laptop or phone. Both overpass-api.de and overpass.kumi.systems block the cloud build machine. Use `--overpass` on the replay tool to try another server.
 - Record a real ride as GPX and replay it at all three levels to tune the 100 m, 10 m and 30 m values.
-- Agree the symbol IDs with whoever does F2, then copy them into the S4 protocol spec.
+- Agree the symbol IDs and screen layout with whoever does F2, then copy them into the S4 protocol spec.
+- Decide whether the module draws the screens itself or receives ready-made frames (part of S4).

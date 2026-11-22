@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:bike_app/screens/ride_screen.dart';
 import 'package:bike_app/services/front_module.dart';
 import 'package:bike_app/services/place_search.dart';
-import 'package:bike_app/widgets/led_matrix.dart';
+import 'package:bike_app/widgets/oled_display.dart';
 import 'package:bike_navigation/bike_navigation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -14,21 +14,6 @@ NavRoute dublinRoute() => parseOrsGeoJson(jsonDecode(File(
         .readAsStringSync()) as Map<String, dynamic>);
 
 void main() {
-  test('every LED symbol ID has a valid 8x8 bitmap', () {
-    final ids = [
-      for (var i = 0; i <= 13; i++) i,
-      for (var d = 1; d <= 9; d++) LedSymbol.exitDigit(d),
-    ];
-    for (final id in ids) {
-      final rows = ledBitmaps[id];
-      expect(rows, isNotNull, reason: 'symbol $id');
-      expect(rows!.length, 8, reason: 'symbol $id');
-      for (final r in rows) {
-        expect(r, matches(RegExp(r'^[.#]{8}$')), reason: 'symbol $id');
-      }
-    }
-  });
-
   test('parses place search results', () {
     final places = parsePlaces({
       'features': [
@@ -47,7 +32,13 @@ void main() {
     final route = dublinRoute();
     final module = PreviewFrontModule();
     final sent = <List<int>>[];
-    module.lastSent.addListener(() => sent.add(module.lastSent.value!.$1));
+    var flashed = false;
+    module.lastSent.addListener(() {
+      final s = module.lastSent.value;
+      if (s == null) return;
+      sent.add(s.symbols);
+      flashed |= s.flash;
+    });
 
     await tester.pumpWidget(MaterialApp(
       home: RideScreen(
@@ -62,7 +53,7 @@ void main() {
       ),
     ));
     await tester.pump();
-    expect(find.textContaining('m'), findsWidgets);
+    expect(find.byType(OledDisplay), findsOneWidget);
 
     // About 340 simulated GPS fixes, 10 ms apart.
     for (var i = 0; i < 400; i++) {
@@ -72,9 +63,10 @@ void main() {
     expect(sent, contains(equals([LedSymbol.left, LedSymbol.right])),
         reason: 'the close left-then-right pair at Parliament Square');
     expect(sent.last, [LedSymbol.arrive]);
+    expect(flashed, isTrue, reason: 'the display flashes at each turn');
 
     // Leaving the screen blanks the matrix.
     await tester.pumpWidget(const SizedBox());
-    expect(module.lastSent.value!.$1, [LedSymbol.blank]);
+    expect(module.lastSent.value, isNull);
   });
 }

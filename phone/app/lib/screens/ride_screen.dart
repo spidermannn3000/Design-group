@@ -6,7 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../config.dart';
 import '../services/front_module.dart';
 import '../services/location.dart';
-import '../widgets/led_matrix.dart';
+import '../widgets/oled_display.dart';
 import '../widgets/route_map.dart';
 
 /// The ride screen: runs navigation from GPS (or a simulated ride), shows
@@ -99,14 +99,14 @@ class _RideScreenState extends State<RideScreen> {
   void _onState(NavState s) {
     if (!mounted) return;
     setState(() => _state = s);
-    widget.frontModule.showNavigation(s.symbols, s.distanceToNextM.round());
+    widget.frontModule.showNavigation(s);
     if (s.arrived) _sub?.cancel();
   }
 
   @override
   void dispose() {
     _sub?.cancel();
-    widget.frontModule.showNavigation(const [LedSymbol.blank], 0);
+    widget.frontModule.showNavigation(null);
     super.dispose();
   }
 
@@ -131,11 +131,17 @@ class _RideScreenState extends State<RideScreen> {
             width: double.infinity,
             color: theme.colorScheme.surfaceContainerHighest,
             padding: const EdgeInsets.all(16),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                LedMatrix(symbols: s?.symbols ?? const [LedSymbol.blank], size: 120),
-                const SizedBox(width: 16),
-                Expanded(child: _instruction(theme, s)),
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: OledDisplay(state: s, width: 256),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _instruction(theme, s),
               ],
             ),
           ),
@@ -208,7 +214,6 @@ class _RideScreenState extends State<RideScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('${s.distanceToNextM.round()} m', style: theme.textTheme.displaySmall),
         Text(next.instruction, style: theme.textTheme.titleMedium, maxLines: 2),
         if (s.then != null)
           Text('then ${s.then!.instruction}', style: theme.textTheme.bodyMedium, maxLines: 1),
