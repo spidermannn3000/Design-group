@@ -79,14 +79,19 @@ class Polyline {
     return best!;
   }
 
-  /// Last segment index that starts within [aheadM] metres of [segment].
-  int segmentAhead(int segment, double aheadM) {
-    final limit = cumulativeM[segment] + aheadM;
-    var i = segment;
-    while (i < segmentCount - 1 && cumulativeM[i + 1] <= limit) {
-      i++;
+  /// Index of the segment containing the point [alongM] metres from the
+  /// start (the last segment if past the end).
+  int segmentAtM(double alongM) {
+    var lo = 0, hi = segmentCount - 1;
+    while (lo < hi) {
+      final mid = (lo + hi + 1) ~/ 2;
+      if (cumulativeM[mid] <= alongM) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
     }
-    return i;
+    return lo;
   }
 
   Projection _projectOnSegment(LatLng p, int i) {

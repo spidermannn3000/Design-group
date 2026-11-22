@@ -45,6 +45,14 @@ class NavConfig {
   /// rider being snapped onto a later part of the route that passes nearby.
   final double searchAheadM;
 
+  /// Two turns this close together are shown as a pair (e.g. left then
+  /// right), so the rider knows about the second before reaching the first.
+  final double closeTurnM;
+
+  /// The display flashes when the turn is this close (metres along the
+  /// route), so the rider knows to turn now.
+  final double flashDistanceM;
+
   const NavConfig({
     this.mode = TriggerMode.distance,
     this.triggerDistanceM = 100,
@@ -54,6 +62,8 @@ class NavConfig {
     this.offRouteFixes = 3,
     this.junctionLeadM = 5,
     this.searchAheadM = 400,
+    this.closeTurnM = 40,
+    this.flashDistanceM = 5,
   });
 }
 
@@ -61,6 +71,10 @@ class NavConfig {
 class NavState {
   /// The manoeuvre coming up, or null once arrived.
   final Manoeuvre? next;
+
+  /// The turn straight after [next], when it is within
+  /// [NavConfig.closeTurnM] and is shown with it as a pair.
+  final Manoeuvre? then;
 
   /// Distance along the route to [next] (metres, never negative).
   final double distanceToNextM;
@@ -74,17 +88,23 @@ class NavState {
   final bool offRoute;
   final bool arrived;
 
+  /// True when the turn is about [NavConfig.flashDistanceM] away or less:
+  /// the display should flash.
+  final bool flash;
+
   /// Rider's progress along the route and distance from it (metres).
   final double alongM;
   final double offsetM;
 
   const NavState({
     required this.next,
+    this.then,
     required this.distanceToNextM,
     required this.showTurn,
     required this.symbols,
     required this.offRoute,
     required this.arrived,
+    this.flash = false,
     required this.alongM,
     required this.offsetM,
   });
@@ -96,6 +116,7 @@ class NavState {
           ? 'OFF ROUTE (${offsetM.round()} m away)'
           : '${showTurn ? next!.kind.name.toUpperCase() : 'straight'}'
               '${next?.exitNumber != null && showTurn ? ' exit ${next!.exitNumber}' : ''}'
+              '${then != null && showTurn ? ' then ${then!.kind.name.toUpperCase()}' : ''}'
               ' - ${next?.kind.name} in ${distanceToNextM.round()} m, symbols $symbols';
 }
 
@@ -127,7 +148,7 @@ class NavigationEngine {
     var p = _locked
         ? line.project(position,
             fromSegment: math.max(0, _segment - 2),
-            toSegment: line.segmentAhead(_segment, config.searchAheadM))
+            toSegment: line.segmentAtM(_alongM + config.searchAheadM))
         : line.project(position);
     if (p.offsetM > threshold && _locked) {
       final global = line.project(position);
@@ -144,16 +165,31 @@ class NavigationEngine {
     }
     final offRoute = _offRouteCount >= config.offRouteFixes;
 
-    // Move past manoeuvres the rider has completed.
-    while (_nextIndex < route.manoeuvres.length) {
-      final m = route.manoeuvres[_nextIndex];
+    // Move past manoeuvres the rider has completed. Normally that is
+    // passMarginM after the turn, but never later than halfway to the next
+    // turn, or two turns a few metres apart would be missed.
+    final ms = route.manoeuvres;
+    while (_nextIndex < ms.length) {
+      final m = ms[_nextIndex];
       if (m.kind == ManoeuvreKind.arrive) break;
-      if (_alongM < m.alongM + config.passMarginM) break;
+      var passAt = m.alongM + config.passMarginM;
+      if (_nextIndex + 1 < ms.length) {
+        passAt = math.min(passAt, (m.alongM + ms[_nextIndex + 1].alongM) / 2);
+      }
+      if (_alongM < passAt) break;
       _nextIndex++;
       _shown = false;
     }
 
     final next = nextManoeuvre;
+    Manoeuvre? then;
+    if (next != null && _nextIndex + 1 < ms.length) {
+      final following = ms[_nextIndex + 1];
+      if (following.kind != ManoeuvreKind.arrive &&
+          following.alongM - next.alongM <= config.closeTurnM) {
+        then = following;
+      }
+    }
     final distance = next == null ? 0.0 : math.max(0.0, next.alongM - _alongM);
     if (next != null &&
         next.kind == ManoeuvreKind.arrive &&
@@ -169,18 +205,28 @@ class NavigationEngine {
     } else if (offRoute) {
       symbols = const [LedSymbol.rerouting];
     } else if (next != null && _shown) {
-      symbols = displaySequence(next);
+      symbols = [
+        ...displaySequence(next),
+        if (then != null) ...displaySequence(then),
+      ];
     } else {
       symbols = const [LedSymbol.straight];
     }
 
     return NavState(
       next: _arrived ? null : next,
+      then: _arrived ? null : then,
       distanceToNextM: distance,
       showTurn: _shown && !_arrived,
       symbols: symbols,
       offRoute: offRoute && !_arrived,
       arrived: _arrived,
+      flash: _shown &&
+          !_arrived &&
+          !offRoute &&
+          next != null &&
+          next.kind != ManoeuvreKind.arrive &&
+          distance <= config.flashDistanceM,
       alongM: _alongM,
       offsetM: p.offsetM,
     );

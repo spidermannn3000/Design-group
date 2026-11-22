@@ -63,9 +63,13 @@ List<LatLng> junctionsFromOverpass(Map<String, dynamic> json) {
 
 Future<List<LatLng>> fetchJunctions(Polyline line,
     {http.Client? client,
-    String endpoint = 'https://overpass-api.de/api/interpreter'}) async {
+    String endpoint = 'https://overpass-api.de/api/interpreter',
+    Duration timeout = const Duration(seconds: 15)}) async {
   final c = client ?? http.Client();
-  final res = await c.post(Uri.parse(endpoint), body: {'data': overpassQuery(line)});
+  // Time limit so a slow or blocked server can't hold up the start of a ride.
+  final res = await c
+      .post(Uri.parse(endpoint), body: {'data': overpassQuery(line)})
+      .timeout(timeout);
   if (res.statusCode != 200) {
     throw Exception('Overpass error ${res.statusCode}: ${res.body}');
   }
@@ -103,8 +107,17 @@ void attachJunctions(NavRoute route, List<LatLng> junctions,
 /// Fetches and attaches junctions in one step. Pass as
 /// [NavigationSession.prepareRoute]. Failure is not fatal: without junctions
 /// Level 3 falls back to the Level 2 distance trigger.
-Future<void> addJunctions(NavRoute route, {http.Client? client}) async {
+///
+/// Returns the number of junctions found, or -1 if the lookup failed.
+Future<int> addJunctions(NavRoute route,
+    {http.Client? client,
+    String endpoint = 'https://overpass-api.de/api/interpreter'}) async {
   try {
-    attachJunctions(route, await fetchJunctions(route.line, client: client));
-  } catch (_) {}
+    final junctions =
+        await fetchJunctions(route.line, client: client, endpoint: endpoint);
+    attachJunctions(route, junctions);
+    return junctions.length;
+  } catch (_) {
+    return -1;
+  }
 }

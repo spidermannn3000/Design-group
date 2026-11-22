@@ -2,7 +2,7 @@
 
 Turn-by-turn cycling navigation for the phone app (tasks N1 to N7). This code runs **on the phone**, inside the Flutter app. It is plain Dart, so it can also be tested on a laptop.
 
-Design notes, the provider comparison and the LED symbol table are in [`docs/navigation.md`](../../docs/navigation.md).
+Design notes, the provider comparison, the symbol table and the OLED screen designs are in [`docs/navigation.md`](../../docs/navigation.md).
 
 | File | Task | What it does |
 |------|------|--------------|
@@ -10,7 +10,8 @@ Design notes, the provider comparison and the LED symbol table are in [`docs/nav
 | `lib/src/engine.dart` | N2, N3, N4, N5 | Takes each GPS fix and decides the next turn, whether to show it yet, and whether the rider is off-route |
 | `lib/src/session.dart` | N5 | One ride: requests the route and reroutes when off-route |
 | `lib/src/junctions.dart` | N4 | Finds side-road junctions from OpenStreetMap (Overpass API) |
-| `lib/src/symbols.dart` | N6 | Manoeuvre to LED symbol ID table |
+| `lib/src/symbols.dart` | N6 | Manoeuvre to display symbol ID table |
+| `lib/src/oled.dart` | F2 | Draws the 128x64 OLED handlebar screen |
 | `lib/src/replay.dart`, `bin/replay.dart` | N7 | Replays a GPX track or a simulated ride |
 | `lib/src/geo.dart` | | Distances and snapping a GPS fix onto the route |
 
@@ -58,4 +59,5 @@ Run with `flutter run --dart-define=ORS_API_KEY=your_key`. Never commit the key.
 dart pub get
 dart test
 dart run bin/replay.dart --route test/fixtures/ors_sample.json
+dart run bin/replay.dart --route test/fixtures/dublin_trinity_to_st_patricks.json
 ```
