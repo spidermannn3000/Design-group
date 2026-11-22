@@ -2,7 +2,12 @@ import 'package:bike_navigation/bike_navigation.dart';
 import 'package:test/test.dart';
 
 NavState turn(ManoeuvreKind kind, double distance, {int? exit}) => NavState(
-      next: Manoeuvre(kind: kind, instruction: '', pointIndex: 0, alongM: 0, exitNumber: exit),
+      next: Manoeuvre(
+          kind: kind,
+          instruction: '',
+          pointIndex: 0,
+          alongM: 0,
+          exitNumber: exit),
       distanceToNextM: distance,
       showTurn: true,
       symbols: const [],
@@ -12,10 +17,10 @@ NavState turn(ManoeuvreKind kind, double distance, {int? exit}) => NavState(
       offsetM: 0,
     );
 
-/// Lit pixels in the arrow area (x < 56, below the label band).
+/// Lit pixels in the arrow area (the left 57 columns).
 Set<(int, int)> arrowPixels(OledFrame f) => {
-      for (var y = 16; y < 64; y++)
-        for (var x = 0; x < 56; x++)
+      for (var y = 0; y < 64; y++)
+        for (var x = 0; x < 57; x++)
           if (f.pixel(x, y)) (x, y),
     };
 
@@ -32,7 +37,9 @@ void main() {
       ManoeuvreKind.uTurn,
       ManoeuvreKind.roundabout,
     ];
-    final arrows = {for (final k in kinds) k: arrowPixels(renderOled(turn(k, 50)))};
+    final arrows = {
+      for (final k in kinds) k: arrowPixels(renderOled(turn(k, 50)))
+    };
     for (final a in arrows.values) {
       expect(a.length, greaterThan(100));
     }
@@ -46,22 +53,28 @@ void main() {
       (ManoeuvreKind.sharpLeft, ManoeuvreKind.sharpRight),
     ]) {
       final left = arrowPixels(renderOled(turn(l, 50)));
-      final mirrored = {for (final (x, y) in arrowPixels(renderOled(turn(r, 50)))) (63 - x, y)};
-      final diff = left.difference(mirrored).length + mirrored.difference(left).length;
+      final mirrored = {
+        for (final (x, y) in arrowPixels(renderOled(turn(r, 50)))) (57 - x, y)
+      };
+      final diff =
+          left.difference(mirrored).length + mirrored.difference(left).length;
       expect(diff, lessThan(left.length ~/ 10), reason: '$l vs $r');
     }
   });
 
   test('sharper turns point further back', () {
-    // Average height of the arrow's left-hand half: a slight left reaches up,
+    // Average height of the arrow tip (the far left): a slight left reaches up,
     // a sharp left reaches down.
     double leftHalfY(ManoeuvreKind k) {
-      final px = arrowPixels(renderOled(turn(k, 50))).where((p) => p.$1 < 26).toList();
+      final px =
+          arrowPixels(renderOled(turn(k, 50))).where((p) => p.$1 < 15).toList();
       return px.map((p) => p.$2).reduce((a, b) => a + b) / px.length;
     }
 
-    expect(leftHalfY(ManoeuvreKind.slightLeft), lessThan(leftHalfY(ManoeuvreKind.left)));
-    expect(leftHalfY(ManoeuvreKind.left), lessThan(leftHalfY(ManoeuvreKind.sharpLeft)));
+    expect(leftHalfY(ManoeuvreKind.slightLeft),
+        lessThan(leftHalfY(ManoeuvreKind.left)));
+    expect(leftHalfY(ManoeuvreKind.left),
+        lessThan(leftHalfY(ManoeuvreKind.sharpLeft)));
   });
 
   test('distance formatting', () {
@@ -73,16 +86,18 @@ void main() {
     expect(formatDistance(12400), ('12', 'km'));
   });
 
-  test('every screen fits: nothing drawn off the edge', () {
+  test('arrow and distance never touch', () {
     for (final d in <double>[3, 99, 850, 2340, 12400]) {
-      final f = renderOled(turn(ManoeuvreKind.roundabout, d, exit: 3));
-      // The distance must not touch the arrow area.
-      final overlap = [
-        for (var y = 16; y < 64; y++)
-          for (var x = 56; x < 58; x++)
-            if (f.pixel(x, y)) 1,
-      ];
-      expect(overlap, isEmpty, reason: '$d m');
+      for (final k in ManoeuvreKind.values) {
+        final f = renderOled(turn(k, d, exit: 3));
+        // A clear gap between the arrow and the distance.
+        final overlap = [
+          for (var y = 0; y < 64; y++)
+            for (var x = 57; x < 59; x++)
+              if (f.pixel(x, y)) 1,
+        ];
+        expect(overlap, isEmpty, reason: '$k at $d m');
+      }
     }
   });
 
@@ -100,7 +115,12 @@ void main() {
 
   test('Bluetooth packet (draft protocol v1)', () {
     final s = NavState(
-      next: Manoeuvre(kind: ManoeuvreKind.roundabout, instruction: '', pointIndex: 0, alongM: 0, exitNumber: 2),
+      next: Manoeuvre(
+          kind: ManoeuvreKind.roundabout,
+          instruction: '',
+          pointIndex: 0,
+          alongM: 0,
+          exitNumber: 2),
       distanceToNextM: 300.4,
       showTurn: true,
       symbols: const [9, 22],
@@ -116,10 +136,22 @@ void main() {
 
   group('flash at 5 m', () {
     final start = LatLng(53.34, -6.26);
-    final line = Polyline([start, offsetM(start, northM: 200), offsetM(start, northM: 200, eastM: 100)]);
+    final line = Polyline([
+      start,
+      offsetM(start, northM: 200),
+      offsetM(start, northM: 200, eastM: 100)
+    ]);
     NavRoute route() => NavRoute(line, [
-          Manoeuvre(kind: ManoeuvreKind.right, instruction: '', pointIndex: 1, alongM: line.cumulativeM[1]),
-          Manoeuvre(kind: ManoeuvreKind.arrive, instruction: '', pointIndex: 2, alongM: line.cumulativeM[2]),
+          Manoeuvre(
+              kind: ManoeuvreKind.right,
+              instruction: '',
+              pointIndex: 1,
+              alongM: line.cumulativeM[1]),
+          Manoeuvre(
+              kind: ManoeuvreKind.arrive,
+              instruction: '',
+              pointIndex: 2,
+              alongM: line.cumulativeM[2]),
         ]);
 
     test('not at 50 m or 8 m, yes at 4 m', () {
@@ -132,7 +164,8 @@ void main() {
     test('not for the destination', () {
       final e = NavigationEngine(route());
       for (final n in <double>[100, 199, 220]) {
-        e.update(offsetM(start, northM: n.clamp(0, 200).toDouble(), eastM: n > 200 ? n - 200 : 0));
+        e.update(offsetM(start,
+            northM: n.clamp(0, 200).toDouble(), eastM: n > 200 ? n - 200 : 0));
       }
       final s = e.update(offsetM(start, northM: 200, eastM: 97));
       expect(s.flash, isFalse);

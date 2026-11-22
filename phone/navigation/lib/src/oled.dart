@@ -8,14 +8,14 @@ import 'route.dart';
 /// over I2C (task F2, replacing the 8x8 LED matrix).
 ///
 /// ```
-///  0 +--------------------------------------+
-///    |        TURN LEFT  (label)            |  rows 0-15: yellow on the
-/// 16 +-------------+------------------------+  yellow/blue version
-///    |   arrow     |        120             |
-///    |  (48x48)    |         m              |  rows 16-63: blue
-/// 63 +-------------+------------------------+
+///  0 +----------------+---------------------+
+///    |                |        120          |
+///    |     arrow      |                     |
+///    |   (58 x 64)    |         m           |
+/// 63 +----------------+---------------------+
 /// ```
 ///
+/// The arrow fills the left of the screen; the distance is on the right.
 /// The arrow angle shows how sharp the turn is: straight 0 deg, slight 45,
 /// normal 90, sharp 135. When the turn is 5 m away the whole screen flashes
 /// (the firmware toggles the SSD1306 "invert display" command).
@@ -147,11 +147,10 @@ class OledFrame {
 /// second.
 OledFrame renderOled(NavState s) {
   final f = OledFrame();
-  const box = 8, boxTop = 16; // arrow area: x 8-55, y 16-63
 
   if (s.arrived) {
     f.centredText(0, 128, 4, 'YOU HAVE ARRIVED');
-    _drawFlag(f, 40, boxTop);
+    _drawFlag(f, 40, 16);
     return f;
   }
   if (s.offRoute) {
@@ -163,40 +162,9 @@ OledFrame renderOled(NavState s) {
   if (next == null) return f;
 
   final kind = s.showTurn ? next.kind : ManoeuvreKind.straight;
-  final then = s.showTurn ? s.then : null;
-  f.centredText(0, 128, 4, _label(kind, next.exitNumber, then?.kind));
-  _drawArrow(f, box.toDouble(), boxTop.toDouble(), kind, next.exitNumber);
+  _drawArrow(f, kind, next.exitNumber);
   _drawDistance(f, s.distanceToNextM);
   return f;
-}
-
-String _label(ManoeuvreKind k, int? exit, ManoeuvreKind? then) {
-  String name(ManoeuvreKind k) => switch (k) {
-        ManoeuvreKind.straight => 'STRAIGHT ON',
-        ManoeuvreKind.left => 'TURN LEFT',
-        ManoeuvreKind.right => 'TURN RIGHT',
-        ManoeuvreKind.slightLeft => 'SLIGHT LEFT',
-        ManoeuvreKind.slightRight => 'SLIGHT RIGHT',
-        ManoeuvreKind.sharpLeft => 'SHARP LEFT',
-        ManoeuvreKind.sharpRight => 'SHARP RIGHT',
-        ManoeuvreKind.uTurn => 'U-TURN',
-        ManoeuvreKind.roundabout => exit == null ? 'ROUNDABOUT' : 'ROUNDABOUT EXIT $exit',
-        ManoeuvreKind.arrive => 'DESTINATION',
-      };
-  String short(ManoeuvreKind k) => switch (k) {
-        ManoeuvreKind.straight => 'AHEAD',
-        ManoeuvreKind.slightLeft => 'SLIGHT L',
-        ManoeuvreKind.slightRight => 'SLIGHT R',
-        ManoeuvreKind.sharpLeft => 'SHARP L',
-        ManoeuvreKind.sharpRight => 'SHARP R',
-        ManoeuvreKind.roundabout => 'RNDABT',
-        _ => name(k).replaceAll('TURN ', ''),
-      };
-  if (then != null) {
-    final long = '${short(k)} THEN ${short(then)}';
-    return OledFrame.textWidth(long) <= OledFrame.width ? long : '${short(k)} > ${short(then)}';
-  }
-  return name(k);
 }
 
 /// Turn angle in degrees: 0 = straight ahead, negative = left.
@@ -211,9 +179,19 @@ double? turnAngle(ManoeuvreKind k) => switch (k) {
       _ => null,
     };
 
-void _drawArrow(OledFrame f, double bx, double by, ManoeuvreKind kind, int? exit) {
-  const r = 2.5; // half the line thickness
-  List<double> p(double x, double y) => [bx + x, by + y];
+/// The arrows are designed on a 48 x 48 grid and scaled up by
+/// [arrowScale] to fill the left 58 x 64 pixels of the screen.
+const double arrowScale = 1.25;
+const double _arrowLeft = -1, _arrowTop = 1.5;
+
+void _drawArrow(OledFrame f, ManoeuvreKind kind, int? exit) {
+  const k = arrowScale;
+  double x(double v) => _arrowLeft + v * k;
+  double y(double v) => _arrowTop + v * k;
+  List<double> p(double px, double py) => [x(px), y(py)];
+  const r = 2.5 * k; // half the line thickness
+  void line(double x0, double y0, double x1, double y1, [double radius = r]) =>
+      f.thickLine(x(x0), y(y0), x(x1), y(y1), radius);
 
   void head(double tipX, double tipY, double angleDeg) {
     final a = angleDeg * math.pi / 180;
@@ -227,7 +205,7 @@ void _drawArrow(OledFrame f, double bx, double by, ManoeuvreKind kind, int? exit
   final angle = turnAngle(kind);
   if (angle != null) {
     if (angle == 0) {
-      f.thickLine(bx + 24, by + 46, bx + 24, by + 14, r);
+      line(24, 46, 24, 14);
       head(24, 3, 0);
       return;
     }
@@ -237,8 +215,8 @@ void _drawArrow(OledFrame f, double bx, double by, ManoeuvreKind kind, int? exit
     final pivotY = angle.abs() > 100 ? 14.0 : angle.abs() > 60 ? 24.0 : 28.0;
     final a = angle * math.pi / 180;
     final endX = pivotX + math.sin(a) * arm, endY = pivotY - math.cos(a) * arm;
-    f.thickLine(bx + pivotX, by + 46, bx + pivotX, by + pivotY, r);
-    f.thickLine(bx + pivotX, by + pivotY, bx + endX, by + endY, r);
+    line(pivotX, 46, pivotX, pivotY);
+    line(pivotX, pivotY, endX, endY);
     head(endX + math.sin(a) * 8, endY - math.cos(a) * 8, angle);
     return;
   }
@@ -246,21 +224,20 @@ void _drawArrow(OledFrame f, double bx, double by, ManoeuvreKind kind, int? exit
     case ManoeuvreKind.uTurn:
       // Up the left side, over the top and back down the right side
       // (traffic keeps left in Ireland, so U-turns go round to the right).
-      f.thickLine(bx + 14, by + 46, bx + 14, by + 20, r);
+      line(14, 46, 14, 20);
       for (var i = 0; i <= 24; i++) {
         final t = math.pi - math.pi * i / 24;
-        f.fillCircle(bx + 24 + math.cos(t) * 10, by + 20 - math.sin(t) * 10, r);
+        f.fillCircle(x(24 + math.cos(t) * 10), y(20 - math.sin(t) * 10), r);
       }
-      f.thickLine(bx + 34, by + 20, bx + 34, by + 28, r);
+      line(34, 20, 34, 28);
       head(34, 40, 180);
     case ManoeuvreKind.roundabout:
       // A clockwise circular arrow (traffic goes clockwise round Irish
-      // roundabouts), like a roundabout road sign, with the
-      // entry from below.
+      // roundabouts) with the entry from below and the exit number inside.
       const cx = 24.0, cy = 25.0, rr = 12.0;
       for (var deg = 200; deg <= 470; deg += 4) {
         final phi = deg * math.pi / 180; // clockwise from the top
-        f.fillCircle(bx + cx + rr * math.sin(phi), by + cy - rr * math.cos(phi), 2);
+        f.fillCircle(x(cx + rr * math.sin(phi)), y(cy - rr * math.cos(phi)), 2 * k);
       }
       const endDeg = 470.0;
       final endPhi = endDeg * math.pi / 180;
@@ -268,10 +245,12 @@ void _drawArrow(OledFrame f, double bx, double by, ManoeuvreKind kind, int? exit
       final ta = tangent * math.pi / 180;
       head(cx + rr * math.sin(endPhi) + math.sin(ta) * 7,
           cy - rr * math.cos(endPhi) - math.cos(ta) * 7, tangent);
-      f.thickLine(bx + cx, by + 46, bx + cx, by + cy + rr, r);
-      if (exit != null) f.centredText((bx + 13).round(), (bx + 35).round(), (by + 18).round(), '$exit', scale: 2);
+      line(cx, 46, cx, cy + rr);
+      if (exit != null) {
+        f.centredText(x(cx - 11).round(), x(cx + 11).round(), y(cy - 7).round(), '$exit', scale: 2);
+      }
     case ManoeuvreKind.arrive:
-      _drawFlag(f, bx.round(), by.round());
+      _drawFlag(f, 6, 6);
     default:
       break;
   }
@@ -301,8 +280,9 @@ void _drawDistance(OledFrame f, double metres) {
   final (number, unit) = formatDistance(metres);
   const left = 58, right = 128;
   final scale = OledFrame.textWidth(number, scale: 4) <= right - left ? 4 : 3;
-  f.centredText(left, right, 20, number, scale: scale);
-  f.centredText(left, right, 50, unit, scale: 2);
+  // Below row 16, so the text is one colour on the yellow/blue module.
+  f.centredText(left, right, 18, number, scale: scale);
+  f.centredText(left, right, 49, unit, scale: 2);
 }
 
 /// Rounds the way bike computers do: to 10 m above 100 m, to 0.1 km from 1 km.

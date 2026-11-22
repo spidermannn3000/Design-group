@@ -28,14 +28,15 @@ Prices and limits change, so recheck them when signing up. Keep the ORS key out 
 
 ## Handlebar display (replaces the 8x8 LED matrix)
 
-The front module now uses a **0.96" 128x64 OLED** (SSD1306 controller, I2C, usually address `0x3C`). On the yellow/blue version, the top 16 pixel rows are yellow and the rest blue.
+The front module now uses a **0.96" 128x64 OLED** (SSD1306 controller, I2C, usually address `0x3C`). On the yellow/blue version, the top 16 pixel rows are yellow and the rest blue, so the top of each arrow shows in yellow. The all-white or all-blue versions avoid that.
 
 ![All the screens](images/oled_screens.png)
 
 Layout:
-- **Top band (yellow):** what to do, in words, e.g. `SLIGHT LEFT`, `ROUNDABOUT EXIT 2`, `LEFT THEN RIGHT`.
-- **Left (48x48):** the arrow. Its angle shows how sharp the turn is: straight 0°, slight 45°, normal 90°, sharp 135°. U-turns go round to the right (traffic keeps left in Ireland). The roundabout is a clockwise circular arrow with the exit number inside.
-- **Right:** distance to the turn, rounded like a bike computer: `87 m`, `120 m` (to 10 m above 100 m), `2.3 km`.
+- **Left (58 x 64):** the arrow, as big as the screen allows. Its angle shows how sharp the turn is: straight 0°, slight 45°, normal 90°, sharp 135°. U-turns go round to the right (traffic keeps left in Ireland). The roundabout is a clockwise circular arrow with the exit number inside.
+- **Right:** distance to the turn, rounded like a bike computer: `87 m`, `120 m` (to 10 m above 100 m), `2.3 km`. It sits below the top 16 rows so it stays one colour on the yellow/blue module.
+- **No text label** on turn screens. Only the arrived, rerouting and no-phone screens have words.
+- **Close turns:** only the next turn is shown. The one after it appears as soon as the rider passes the first.
 - **Flash:** when the turn is **5 m** away or less (measured along the route), the screen inverts 4 times a second until the rider has passed the turn. The firmware does this with the SSD1306 invert command (`display.invertDisplay()` in the Adafruit library), so nothing needs redrawing. With phone GPS error of 5-10 m, the flash can start a few metres early or late.
 
 `phone/navigation/lib/src/oled.dart` draws every screen pixel for pixel (`renderOled`), and the phone app previews exactly that. The ESP32 firmware in [`front-module/`](../front-module/README.md) draws the same screens itself from a small Bluetooth message (draft protocol in `protocol.dart`). `front-module/test_native/check.sh` confirms that the two match on 503 screens.
@@ -66,7 +67,7 @@ These IDs go over Bluetooth (S4). They say which screen to draw. The distance an
 
 Not shown: depart (11) and exit roundabout (8), because the exit number is already on the enter-roundabout step.
 
-A roundabout is sent as `[9, 2x]` (2nd exit = `[9, 22]`). Two turns 40 m or less apart are sent together, e.g. left then right = `[2, 3]`. The screen shows the first arrow with `LEFT THEN RIGHT` in the top band.
+A roundabout is sent as `[9, 2x]` (2nd exit = `[9, 22]`). Two turns 40 m or less apart are sent together, e.g. left then right = `[2, 3]`. The screen shows only the first; the app shows both.
 
 ## How the levels decide when to show a turn
 

@@ -145,38 +145,6 @@ void centredText(Canvas& c, int left, int right, int y, const char* s, int scale
 
 // ---- screens ---------------------------------------------------------------
 
-const char* longName(uint8_t k) {
-  switch (k) {
-    case kStraight: return "STRAIGHT ON";
-    case kLeft: return "TURN LEFT";
-    case kRight: return "TURN RIGHT";
-    case kSlightLeft: return "SLIGHT LEFT";
-    case kSlightRight: return "SLIGHT RIGHT";
-    case kSharpLeft: return "SHARP LEFT";
-    case kSharpRight: return "SHARP RIGHT";
-    case kUTurn: return "U-TURN";
-    case kRoundabout: return "ROUNDABOUT";
-    case kArrive: return "DESTINATION";
-    default: return "";
-  }
-}
-
-const char* shortName(uint8_t k) {
-  switch (k) {
-    case kStraight: return "AHEAD";
-    case kLeft: return "LEFT";
-    case kRight: return "RIGHT";
-    case kSlightLeft: return "SLIGHT L";
-    case kSlightRight: return "SLIGHT R";
-    case kSharpLeft: return "SHARP L";
-    case kSharpRight: return "SHARP R";
-    case kUTurn: return "U-TURN";
-    case kRoundabout: return "RNDABT";
-    case kArrive: return "DESTINATION";
-    default: return "";
-  }
-}
-
 // Turn angle in degrees (0 = straight, negative = left), or false if the
 // symbol is not a simple turn.
 bool turnAngle(uint8_t k, double& angle) {
@@ -208,9 +176,20 @@ void drawFlag(Canvas& c, int x, int y) {
   }
 }
 
-struct ArrowBox {
+// The arrows are designed on a 48 x 48 grid and scaled up to fill the left
+// 58 x 64 pixels of the screen (same as arrowScale in oled.dart).
+constexpr double kArrowScale = 1.25;
+constexpr double kArrowLeft = -1, kArrowTop = 1.5;
+
+struct Arrow {
   Canvas& c;
-  double bx, by;
+
+  static double x(double v) { return kArrowLeft + v * kArrowScale; }
+  static double y(double v) { return kArrowTop + v * kArrowScale; }
+
+  void line(double x0, double y0, double x1, double y1) {
+    thickLine(c, x(x0), y(y0), x(x1), y(y1), 2.5 * kArrowScale);
+  }
 
   // Filled arrowhead with its tip at (tipX, tipY), pointing along angleDeg.
   void head(double tipX, double tipY, double angleDeg) {
@@ -218,18 +197,18 @@ struct ArrowBox {
     const double dx = sin(a), dy = -cos(a);
     const double len = 9.0, half = 6.5;
     const double baseX = tipX - dx * len, baseY = tipY - dy * len;
-    const double p0[2] = {bx + tipX, by + tipY};
-    const double p1[2] = {bx + baseX - dy * half, by + baseY + dx * half};
-    const double p2[2] = {bx + baseX + dy * half, by + baseY - dx * half};
+    const double p0[2] = {x(tipX), y(tipY)};
+    const double p1[2] = {x(baseX - dy * half), y(baseY + dx * half)};
+    const double p2[2] = {x(baseX + dy * half), y(baseY - dx * half)};
     fillTriangle(c, p0, p1, p2);
   }
 
   void draw(uint8_t kind, int exitNumber) {
-    const double r = 2.5;  // half the line thickness
+    const double r = 2.5 * kArrowScale;  // half the line thickness
     double angle;
     if (turnAngle(kind, angle)) {
       if (angle == 0) {
-        thickLine(c, bx + 24, by + 46, bx + 24, by + 14, r);
+        line(24, 46, 24, 14);
         head(24, 3, 0);
         return;
       }
@@ -239,20 +218,20 @@ struct ArrowBox {
       const double pivotY = fabs(angle) > 100 ? 14.0 : fabs(angle) > 60 ? 24.0 : 28.0;
       const double a = angle * kPi / 180;
       const double endX = pivotX + sin(a) * arm, endY = pivotY - cos(a) * arm;
-      thickLine(c, bx + pivotX, by + 46, bx + pivotX, by + pivotY, r);
-      thickLine(c, bx + pivotX, by + pivotY, bx + endX, by + endY, r);
+      line(pivotX, 46, pivotX, pivotY);
+      line(pivotX, pivotY, endX, endY);
       head(endX + sin(a) * 8, endY - cos(a) * 8, angle);
       return;
     }
     switch (kind) {
       case kUTurn:
         // Traffic keeps left in Ireland, so U-turns go round to the right.
-        thickLine(c, bx + 14, by + 46, bx + 14, by + 20, r);
+        line(14, 46, 14, 20);
         for (int i = 0; i <= 24; i++) {
           const double t = kPi - kPi * i / 24;
-          fillCircle(c, bx + 24 + cos(t) * 10, by + 20 - sin(t) * 10, r);
+          fillCircle(c, x(24 + cos(t) * 10), y(20 - sin(t) * 10), r);
         }
-        thickLine(c, bx + 34, by + 20, bx + 34, by + 28, r);
+        line(34, 20, 34, 28);
         head(34, 40, 180);
         break;
       case kRoundabout: {
@@ -260,23 +239,23 @@ struct ArrowBox {
         const double cx = 24.0, cy = 25.0, rr = 12.0;
         for (int deg = 200; deg <= 470; deg += 4) {
           const double phi = deg * kPi / 180;
-          fillCircle(c, bx + cx + rr * sin(phi), by + cy - rr * cos(phi), 2);
+          fillCircle(c, x(cx + rr * sin(phi)), y(cy - rr * cos(phi)), 2 * kArrowScale);
         }
         const double endDeg = 470.0;
         const double endPhi = endDeg * kPi / 180;
         const double tangent = endDeg + 90;
         const double ta = tangent * kPi / 180;
         head(cx + rr * sin(endPhi) + sin(ta) * 7, cy - rr * cos(endPhi) - cos(ta) * 7, tangent);
-        thickLine(c, bx + cx, by + 46, bx + cx, by + cy + rr, r);
+        line(cx, 46, cx, cy + rr);
         if (exitNumber > 0) {
           char digit[4];
           snprintf(digit, sizeof digit, "%d", exitNumber);
-          centredText(c, (int)lround(bx + 13), (int)lround(bx + 35), (int)lround(by + 18), digit, 2);
+          centredText(c, (int)lround(x(cx - 11)), (int)lround(x(cx + 11)), (int)lround(y(cy - 7)), digit, 2);
         }
         break;
       }
       case kArrive:
-        drawFlag(c, (int)lround(bx), (int)lround(by));
+        drawFlag(c, 6, 6);
         break;
       default:
         break;
@@ -301,8 +280,9 @@ void drawDistance(Canvas& c, uint16_t m) {
   }
   const int left = 58, right = 128;
   const int scale = textWidth(number, 4) <= right - left ? 4 : 3;
-  centredText(c, left, right, 20, number, scale);
-  centredText(c, left, right, 50, unit, 2);
+  // Below row 16, so the text is one colour on the yellow/blue module.
+  centredText(c, left, right, 18, number, scale);
+  centredText(c, left, right, 49, unit, 2);
 }
 
 }  // namespace
@@ -337,30 +317,14 @@ void draw(Canvas& c, const NavMessage& msg) {
     return;
   }
 
-  // [9, 22] = roundabout exit 2. Anything after that is the next turn,
-  // shown together because it is close.
-  int i = 1, exitNumber = 0;
-  if (kind == kRoundabout && i < msg.count && msg.symbols[i] > kExitDigitBase &&
-      msg.symbols[i] <= kExitDigitBase + 9) {
-    exitNumber = msg.symbols[i++] - kExitDigitBase;
+  // [9, 22] = roundabout exit 2. Any symbol after that is the turn after
+  // this one; the screen shows only the next turn.
+  int exitNumber = 0;
+  if (kind == kRoundabout && msg.count > 1 && msg.symbols[1] > kExitDigitBase &&
+      msg.symbols[1] <= kExitDigitBase + 9) {
+    exitNumber = msg.symbols[1] - kExitDigitBase;
   }
-  const uint8_t then = i < msg.count ? msg.symbols[i] : (uint8_t)kBlank;
-
-  char label[40];
-  if (then != kBlank) {
-    snprintf(label, sizeof label, "%s THEN %s", shortName(kind), shortName(then));
-    if (textWidth(label, 1) > kWidth) {
-      snprintf(label, sizeof label, "%s > %s", shortName(kind), shortName(then));
-    }
-  } else if (kind == kRoundabout && exitNumber > 0) {
-    snprintf(label, sizeof label, "ROUNDABOUT EXIT %d", exitNumber);
-  } else {
-    snprintf(label, sizeof label, "%s", longName(kind));
-  }
-  centredText(c, 0, 128, 4, label);
-
-  ArrowBox box{c, 8, 16};
-  box.draw(kind, exitNumber);
+  Arrow{c}.draw(kind, exitNumber);
   if (msg.distanceM != kNoDistance) drawDistance(c, msg.distanceM);
 }
 
