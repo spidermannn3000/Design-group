@@ -28,13 +28,13 @@ Prices and limits change, so recheck them when signing up. Keep the ORS key out 
 
 ## Handlebar display (replaces the 8x8 LED matrix)
 
-The front module now uses a **0.96" 128x64 OLED** (SSD1306 controller, I2C, usually address `0x3C`). On the yellow/blue version, the top 16 pixel rows are yellow and the rest blue, so the top of each arrow shows in yellow. The all-white or all-blue versions avoid that.
+The front module now uses a **0.96" 128x64 OLED** (SSD1306 controller, I2C, usually address `0x3C`). **Buy the Blue (or White) version, not Yellow Blue.** On the yellow/blue one, the top 16 rows can only ever light up yellow, so the top of every arrow would be yellow.
 
 ![All the screens](images/oled_screens.png)
 
 Layout:
-- **Left (58 x 64):** the arrow, as big as the screen allows. Its angle shows how sharp the turn is: straight 0°, slight 45°, normal 90°, sharp 135°. U-turns go round to the right (traffic keeps left in Ireland). The roundabout is a clockwise circular arrow with the exit number inside.
-- **Right:** distance to the turn, rounded like a bike computer: `87 m`, `120 m` (to 10 m above 100 m), `2.3 km`. It sits below the top 16 rows so it stays one colour on the yellow/blue module.
+- **Left (57 x 64):** the arrow, as big as possible. Each arrow is measured and scaled to fill the area: tall arrows use the full height, wide ones the full width. Its angle shows how sharp the turn is: straight 0°, slight 45°, normal 90°, sharp 135°. U-turns go round to the right (traffic keeps left in Ireland). The roundabout is a clockwise circular arrow with the exit number inside.
+- **Right:** distance to the turn, rounded like a bike computer: `87 m`, `120 m` (to 10 m above 100 m), `2.3 km`.
 - **No text label** on turn screens. Only the arrived, rerouting and no-phone screens have words.
 - **Close turns:** only the next turn is shown. The one after it appears as soon as the rider passes the first.
 - **Flash:** when the turn is **5 m** away or less (measured along the route), the screen inverts 4 times a second until the rider has passed the turn. The firmware does this with the SSD1306 invert command (`display.invertDisplay()` in the Adafruit library), so nothing needs redrawing. With phone GPS error of 5-10 m, the flash can start a few metres early or late.

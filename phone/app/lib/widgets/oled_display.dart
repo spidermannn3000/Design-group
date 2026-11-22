@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:bike_navigation/bike_navigation.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// The two colour versions of the 0.96" SSD1306 module.
-enum OledColours { yellowBlue, white }
+/// The colour versions of the 0.96" SSD1306 module. Buy the blue or white
+/// one: on the yellow/blue one the top 16 rows can only ever be yellow.
+enum OledColours { blue, white, yellowBlue }
 
 /// Pixel-exact preview of the handlebar OLED (128x64). Uses the same
 /// [renderOled] as the module, and flashes the same way: inverting the
@@ -18,7 +19,7 @@ class OledDisplay extends StatefulWidget {
     super.key,
     required this.state,
     this.width = 256,
-    this.colours = OledColours.yellowBlue,
+    this.colours = OledColours.blue,
   });
 
   @override
@@ -78,10 +79,14 @@ class _OledPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final px = size.width / OledFrame.width;
     canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF07080C));
+    const blue = Color(0xFF5ABEFF), white = Color(0xFFF2F4FF), yellow = Color(0xFFFFC828);
     final top = Paint()
-      ..color = colours == OledColours.yellowBlue ? const Color(0xFFFFC828) : const Color(0xFFF2F4FF);
-    final bottom = Paint()
-      ..color = colours == OledColours.yellowBlue ? const Color(0xFF5ABEFF) : const Color(0xFFF2F4FF);
+      ..color = switch (colours) {
+        OledColours.blue => blue,
+        OledColours.white => white,
+        OledColours.yellowBlue => yellow,
+      };
+    final bottom = Paint()..color = colours == OledColours.white ? white : blue;
     for (var y = 0; y < OledFrame.height; y++) {
       final paint = y < OledFrame.yellowRows ? top : bottom;
       for (var x = 0; x < OledFrame.width; x++) {

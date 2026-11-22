@@ -176,92 +176,138 @@ void drawFlag(Canvas& c, int x, int y) {
   }
 }
 
-// The arrows are designed on a 48 x 48 grid and scaled up to fill the left
-// 58 x 64 pixels of the screen (same as arrowScale in oled.dart).
-constexpr double kArrowScale = 1.25;
-constexpr double kArrowLeft = -1, kArrowTop = 1.5;
+// ---- arrows ------------------------------------------------------------------
+//
+// Each arrow is designed once on a small grid, then measured and scaled up to
+// fill the arrow area (the left 57 x 64 pixels) as fully as its shape allows.
+// Same as oled.dart.
 
-struct Arrow {
-  Canvas& c;
+constexpr double kAreaLeft = 0.5, kAreaTop = 0.5, kAreaWidth = 56, kAreaHeight = 63;
+constexpr double kLineR = 3.0, kHeadLen = 10.0, kHeadHalf = 7.5;
+constexpr double kRbX = 24, kRbY = 25, kRbR = 13;  // roundabout ring
 
-  static double x(double v) { return kArrowLeft + v * kArrowScale; }
-  static double y(double v) { return kArrowTop + v * kArrowScale; }
+// Measures shapes (scale == 0) or draws them scaled onto the canvas.
+struct Pen {
+  Canvas* c = nullptr;
+  double scale = 0, left = 0, top = 0;
+  double minX = INFINITY, minY = INFINITY, maxX = -INFINITY, maxY = -INFINITY;
 
-  void line(double x0, double y0, double x1, double y1) {
-    thickLine(c, x(x0), y(y0), x(x1), y(y1), 2.5 * kArrowScale);
+  bool measuring() const { return c == nullptr; }
+  double x(double v) const { return left + v * scale; }
+  double y(double v) const { return top + v * scale; }
+  void add(double px, double py, double r) {
+    minX = fmin(minX, px - r);
+    maxX = fmax(maxX, px + r);
+    minY = fmin(minY, py - r);
+    maxY = fmax(maxY, py + r);
   }
-
-  // Filled arrowhead with its tip at (tipX, tipY), pointing along angleDeg.
+  void dot(double px, double py, double r) {
+    if (measuring()) return add(px, py, r);
+    fillCircle(*c, x(px), y(py), r * scale);
+  }
+  void line(double x0, double y0, double x1, double y1, double r) {
+    if (measuring()) {
+      add(x0, y0, r);
+      add(x1, y1, r);
+      return;
+    }
+    thickLine(*c, x(x0), y(y0), x(x1), y(y1), r * scale);
+  }
+  void triangle(const double* a, const double* b, const double* d) {
+    if (measuring()) {
+      add(a[0], a[1], 0);
+      add(b[0], b[1], 0);
+      add(d[0], d[1], 0);
+      return;
+    }
+    const double pa[2] = {x(a[0]), y(a[1])}, pb[2] = {x(b[0]), y(b[1])}, pd[2] = {x(d[0]), y(d[1])};
+    fillTriangle(*c, pa, pb, pd);
+  }
   void head(double tipX, double tipY, double angleDeg) {
     const double a = angleDeg * kPi / 180;
     const double dx = sin(a), dy = -cos(a);
-    const double len = 9.0, half = 6.5;
-    const double baseX = tipX - dx * len, baseY = tipY - dy * len;
-    const double p0[2] = {x(tipX), y(tipY)};
-    const double p1[2] = {x(baseX - dy * half), y(baseY + dx * half)};
-    const double p2[2] = {x(baseX + dy * half), y(baseY - dx * half)};
-    fillTriangle(c, p0, p1, p2);
-  }
-
-  void draw(uint8_t kind, int exitNumber) {
-    const double r = 2.5 * kArrowScale;  // half the line thickness
-    double angle;
-    if (turnAngle(kind, angle)) {
-      if (angle == 0) {
-        line(24, 46, 24, 14);
-        head(24, 3, 0);
-        return;
-      }
-      // Stem up to the junction, then off at the turn angle. Sharp turns
-      // bend back down, so their junction sits higher.
-      const double pivotX = 24.0, arm = 14.0;
-      const double pivotY = fabs(angle) > 100 ? 14.0 : fabs(angle) > 60 ? 24.0 : 28.0;
-      const double a = angle * kPi / 180;
-      const double endX = pivotX + sin(a) * arm, endY = pivotY - cos(a) * arm;
-      line(pivotX, 46, pivotX, pivotY);
-      line(pivotX, pivotY, endX, endY);
-      head(endX + sin(a) * 8, endY - cos(a) * 8, angle);
-      return;
-    }
-    switch (kind) {
-      case kUTurn:
-        // Traffic keeps left in Ireland, so U-turns go round to the right.
-        line(14, 46, 14, 20);
-        for (int i = 0; i <= 24; i++) {
-          const double t = kPi - kPi * i / 24;
-          fillCircle(c, x(24 + cos(t) * 10), y(20 - sin(t) * 10), r);
-        }
-        line(34, 20, 34, 28);
-        head(34, 40, 180);
-        break;
-      case kRoundabout: {
-        // Clockwise circular arrow, like a roundabout road sign.
-        const double cx = 24.0, cy = 25.0, rr = 12.0;
-        for (int deg = 200; deg <= 470; deg += 4) {
-          const double phi = deg * kPi / 180;
-          fillCircle(c, x(cx + rr * sin(phi)), y(cy - rr * cos(phi)), 2 * kArrowScale);
-        }
-        const double endDeg = 470.0;
-        const double endPhi = endDeg * kPi / 180;
-        const double tangent = endDeg + 90;
-        const double ta = tangent * kPi / 180;
-        head(cx + rr * sin(endPhi) + sin(ta) * 7, cy - rr * cos(endPhi) - cos(ta) * 7, tangent);
-        line(cx, 46, cx, cy + rr);
-        if (exitNumber > 0) {
-          char digit[4];
-          snprintf(digit, sizeof digit, "%d", exitNumber);
-          centredText(c, (int)lround(x(cx - 11)), (int)lround(x(cx + 11)), (int)lround(y(cy - 7)), digit, 2);
-        }
-        break;
-      }
-      case kArrive:
-        drawFlag(c, 6, 6);
-        break;
-      default:
-        break;
-    }
+    const double baseX = tipX - dx * kHeadLen, baseY = tipY - dy * kHeadLen;
+    const double p0[2] = {tipX, tipY};
+    const double p1[2] = {baseX - dy * kHeadHalf, baseY + dx * kHeadHalf};
+    const double p2[2] = {baseX + dy * kHeadHalf, baseY - dx * kHeadHalf};
+    triangle(p0, p1, p2);
   }
 };
+
+// The arrow for `kind` in design units. Returns false if there is none.
+bool arrowShape(Pen& pen, uint8_t kind) {
+  double angle;
+  if (turnAngle(kind, angle)) {
+    if (angle == 0) {
+      pen.line(24, 46, 24, 12, kLineR);
+      pen.head(24, 2, 0);
+      return true;
+    }
+    // Stem up to the junction, then off at the turn angle. Sharp turns bend
+    // back down, so their junction sits higher.
+    const double pivotX = 24.0, arm = 14.0;
+    const double pivotY = fabs(angle) > 100 ? 14.0 : fabs(angle) > 60 ? 24.0 : 28.0;
+    const double a = angle * kPi / 180;
+    const double endX = pivotX + sin(a) * arm, endY = pivotY - cos(a) * arm;
+    pen.line(pivotX, 46, pivotX, pivotY, kLineR);
+    pen.line(pivotX, pivotY, endX, endY, kLineR);
+    pen.head(endX + sin(a) * 9, endY - cos(a) * 9, angle);
+    return true;
+  }
+  switch (kind) {
+    case kUTurn:
+      // Traffic keeps left in Ireland, so U-turns go round to the right.
+      pen.line(14, 46, 14, 20, kLineR);
+      for (int i = 0; i <= 24; i++) {
+        const double t = kPi - kPi * i / 24;
+        pen.dot(24 + cos(t) * 10, 20 - sin(t) * 10, kLineR);
+      }
+      pen.line(34, 20, 34, 28, kLineR);
+      pen.head(34, 40, 180);
+      return true;
+    case kRoundabout: {
+      // Clockwise circular arrow, like a roundabout road sign.
+      for (int deg = 200; deg <= 470; deg += 4) {
+        const double phi = deg * kPi / 180;
+        pen.dot(kRbX + kRbR * sin(phi), kRbY - kRbR * cos(phi), kLineR * 0.8);
+      }
+      const double endDeg = 470.0;
+      const double endPhi = endDeg * kPi / 180;
+      const double tangent = endDeg + 90;
+      const double ta = tangent * kPi / 180;
+      pen.head(kRbX + kRbR * sin(endPhi) + sin(ta) * 8, kRbY - kRbR * cos(endPhi) - cos(ta) * 8, tangent);
+      pen.line(kRbX, 46, kRbX, kRbY + kRbR, kLineR);
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+void drawArrow(Canvas& c, uint8_t kind, int exitNumber) {
+  if (kind == kArrive) {
+    drawFlag(c, 6, 6);
+    return;
+  }
+  Pen bounds;
+  if (!arrowShape(bounds, kind)) return;
+  const double w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
+  Pen pen;
+  pen.c = &c;
+  pen.scale = fmin(kAreaWidth / w, kAreaHeight / h);
+  pen.left = kAreaLeft + (kAreaWidth - w * pen.scale) / 2 - bounds.minX * pen.scale;
+  pen.top = kAreaTop + (kAreaHeight - h * pen.scale) / 2 - bounds.minY * pen.scale;
+  arrowShape(pen, kind);
+
+  if (kind == kRoundabout && exitNumber > 0) {
+    // Exit number in the middle of the ring, as large as fits.
+    const int digitScale = pen.scale >= 1.5 ? 3 : 2;
+    const int cx = (int)lround(pen.x(kRbX)), cy = (int)lround(pen.y(kRbY));
+    char digit[4];
+    snprintf(digit, sizeof digit, "%d", exitNumber);
+    text(c, cx - (5 * digitScale) / 2, cy - (7 * digitScale) / 2, digit, digitScale);
+  }
+}
 
 // "120" over "m", or "2.3" over "km". Same rounding as formatDistance.
 void drawDistance(Canvas& c, uint16_t m) {
@@ -324,7 +370,7 @@ void draw(Canvas& c, const NavMessage& msg) {
       msg.symbols[1] <= kExitDigitBase + 9) {
     exitNumber = msg.symbols[1] - kExitDigitBase;
   }
-  Arrow{c}.draw(kind, exitNumber);
+  drawArrow(c, kind, exitNumber);
   if (msg.distanceM != kNoDistance) drawDistance(c, msg.distanceM);
 }
 

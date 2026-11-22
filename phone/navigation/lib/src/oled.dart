@@ -179,35 +179,86 @@ double? turnAngle(ManoeuvreKind k) => switch (k) {
       _ => null,
     };
 
-/// The arrows are designed on a 48 x 48 grid and scaled up by
-/// [arrowScale] to fill the left 58 x 64 pixels of the screen.
-const double arrowScale = 1.25;
-const double _arrowLeft = -1, _arrowTop = 1.5;
+// ---- arrows ------------------------------------------------------------------
+//
+// Each arrow is designed once on a small grid, then measured and scaled up
+// to fill the arrow area (the left 57 x 64 pixels) as fully as its shape
+// allows: tall arrows use the full height, wide ones the full width.
 
-void _drawArrow(OledFrame f, ManoeuvreKind kind, int? exit) {
-  const k = arrowScale;
-  double x(double v) => _arrowLeft + v * k;
-  double y(double v) => _arrowTop + v * k;
-  List<double> p(double px, double py) => [x(px), y(py)];
-  const r = 2.5 * k; // half the line thickness
-  void line(double x0, double y0, double x1, double y1, [double radius = r]) =>
-      f.thickLine(x(x0), y(y0), x(x1), y(y1), radius);
+/// The arrow area: x 0-56, y 0-63, with half a pixel of margin.
+const double _areaLeft = 0.5, _areaTop = 0.5, _areaWidth = 56, _areaHeight = 63;
 
+/// Line thickness (half-width) and arrowhead size, in design units.
+const double _lineR = 3.0, _headLen = 10.0, _headHalf = 7.5;
+
+/// Draws or measures shapes. Coordinates are in design units.
+abstract class _Pen {
+  void dot(double x, double y, double r);
+  void line(double x0, double y0, double x1, double y1, double r);
+  void triangle(List<double> a, List<double> b, List<double> c);
+}
+
+/// Measures the extent of an arrow in design units.
+class _BoundsPen implements _Pen {
+  double minX = double.infinity, minY = double.infinity;
+  double maxX = -double.infinity, maxY = -double.infinity;
+  void _add(double x, double y, double r) {
+    minX = math.min(minX, x - r);
+    maxX = math.max(maxX, x + r);
+    minY = math.min(minY, y - r);
+    maxY = math.max(maxY, y + r);
+  }
+
+  @override
+  void dot(double x, double y, double r) => _add(x, y, r);
+  @override
+  void line(double x0, double y0, double x1, double y1, double r) {
+    _add(x0, y0, r);
+    _add(x1, y1, r);
+  }
+
+  @override
+  void triangle(List<double> a, List<double> b, List<double> c) {
+    _add(a[0], a[1], 0);
+    _add(b[0], b[1], 0);
+    _add(c[0], c[1], 0);
+  }
+}
+
+/// Draws onto the frame, scaled and shifted to fill the arrow area.
+class _FramePen implements _Pen {
+  final OledFrame f;
+  final double scale, left, top;
+  _FramePen(this.f, this.scale, this.left, this.top);
+  double x(double v) => left + v * scale;
+  double y(double v) => top + v * scale;
+
+  @override
+  void dot(double px, double py, double r) => f.fillCircle(x(px), y(py), r * scale);
+  @override
+  void line(double x0, double y0, double x1, double y1, double r) =>
+      f.thickLine(x(x0), y(y0), x(x1), y(y1), r * scale);
+  @override
+  void triangle(List<double> a, List<double> b, List<double> c) =>
+      f.fillTriangle([x(a[0]), y(a[1])], [x(b[0]), y(b[1])], [x(c[0]), y(c[1])]);
+}
+
+/// The arrow shape for [kind] in design units. Returns false if there is none.
+bool _arrowShape(_Pen pen, ManoeuvreKind kind) {
   void head(double tipX, double tipY, double angleDeg) {
     final a = angleDeg * math.pi / 180;
     final dx = math.sin(a), dy = -math.cos(a); // direction of travel
-    const len = 9.0, half = 6.5;
-    final baseX = tipX - dx * len, baseY = tipY - dy * len;
-    f.fillTriangle(p(tipX, tipY), p(baseX - dy * half, baseY + dx * half),
-        p(baseX + dy * half, baseY - dx * half));
+    final baseX = tipX - dx * _headLen, baseY = tipY - dy * _headLen;
+    pen.triangle([tipX, tipY], [baseX - dy * _headHalf, baseY + dx * _headHalf],
+        [baseX + dy * _headHalf, baseY - dx * _headHalf]);
   }
 
   final angle = turnAngle(kind);
   if (angle != null) {
     if (angle == 0) {
-      line(24, 46, 24, 14);
-      head(24, 3, 0);
-      return;
+      pen.line(24, 46, 24, 12, _lineR);
+      head(24, 2, 0);
+      return true;
     }
     // Stem up from the bottom to the junction, then off at the turn angle.
     // Sharp turns bend back down, so their junction sits higher.
@@ -215,44 +266,65 @@ void _drawArrow(OledFrame f, ManoeuvreKind kind, int? exit) {
     final pivotY = angle.abs() > 100 ? 14.0 : angle.abs() > 60 ? 24.0 : 28.0;
     final a = angle * math.pi / 180;
     final endX = pivotX + math.sin(a) * arm, endY = pivotY - math.cos(a) * arm;
-    line(pivotX, 46, pivotX, pivotY);
-    line(pivotX, pivotY, endX, endY);
-    head(endX + math.sin(a) * 8, endY - math.cos(a) * 8, angle);
-    return;
+    pen.line(pivotX, 46, pivotX, pivotY, _lineR);
+    pen.line(pivotX, pivotY, endX, endY, _lineR);
+    head(endX + math.sin(a) * 9, endY - math.cos(a) * 9, angle);
+    return true;
   }
   switch (kind) {
     case ManoeuvreKind.uTurn:
       // Up the left side, over the top and back down the right side
       // (traffic keeps left in Ireland, so U-turns go round to the right).
-      line(14, 46, 14, 20);
+      pen.line(14, 46, 14, 20, _lineR);
       for (var i = 0; i <= 24; i++) {
         final t = math.pi - math.pi * i / 24;
-        f.fillCircle(x(24 + math.cos(t) * 10), y(20 - math.sin(t) * 10), r);
+        pen.dot(24 + math.cos(t) * 10, 20 - math.sin(t) * 10, _lineR);
       }
-      line(34, 20, 34, 28);
+      pen.line(34, 20, 34, 28, _lineR);
       head(34, 40, 180);
+      return true;
     case ManoeuvreKind.roundabout:
       // A clockwise circular arrow (traffic goes clockwise round Irish
-      // roundabouts) with the entry from below and the exit number inside.
-      const cx = 24.0, cy = 25.0, rr = 12.0;
+      // roundabouts) with the entry from below.
       for (var deg = 200; deg <= 470; deg += 4) {
         final phi = deg * math.pi / 180; // clockwise from the top
-        f.fillCircle(x(cx + rr * math.sin(phi)), y(cy - rr * math.cos(phi)), 2 * k);
+        pen.dot(_rbX + _rbR * math.sin(phi), _rbY - _rbR * math.cos(phi), _lineR * 0.8);
       }
       const endDeg = 470.0;
       final endPhi = endDeg * math.pi / 180;
       final tangent = endDeg + 90; // direction of travel at the end of the arc
       final ta = tangent * math.pi / 180;
-      head(cx + rr * math.sin(endPhi) + math.sin(ta) * 7,
-          cy - rr * math.cos(endPhi) - math.cos(ta) * 7, tangent);
-      line(cx, 46, cx, cy + rr);
-      if (exit != null) {
-        f.centredText(x(cx - 11).round(), x(cx + 11).round(), y(cy - 7).round(), '$exit', scale: 2);
-      }
-    case ManoeuvreKind.arrive:
-      _drawFlag(f, 6, 6);
+      head(_rbX + _rbR * math.sin(endPhi) + math.sin(ta) * 8,
+          _rbY - _rbR * math.cos(endPhi) - math.cos(ta) * 8, tangent);
+      pen.line(_rbX, 46, _rbX, _rbY + _rbR, _lineR);
+      return true;
     default:
-      break;
+      return false;
+  }
+}
+
+/// Roundabout ring centre and radius, in design units.
+const double _rbX = 24, _rbY = 25, _rbR = 13;
+
+void _drawArrow(OledFrame f, ManoeuvreKind kind, int? exit) {
+  if (kind == ManoeuvreKind.arrive) {
+    _drawFlag(f, 6, 6);
+    return;
+  }
+  final bounds = _BoundsPen();
+  if (!_arrowShape(bounds, kind)) return;
+  final w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
+  final scale = math.min(_areaWidth / w, _areaHeight / h);
+  final left = _areaLeft + (_areaWidth - w * scale) / 2 - bounds.minX * scale;
+  final top = _areaTop + (_areaHeight - h * scale) / 2 - bounds.minY * scale;
+  final pen = _FramePen(f, scale, left, top);
+  _arrowShape(pen, kind);
+
+  if (kind == ManoeuvreKind.roundabout && exit != null) {
+    // Exit number in the middle of the ring, as large as fits.
+    final digitScale = scale >= 1.5 ? 3 : 2;
+    final cx = pen.x(_rbX).round(), cy = pen.y(_rbY).round();
+    f.text(cx - (5 * digitScale) ~/ 2, cy - (7 * digitScale) ~/ 2, '$exit', scale: digitScale);
   }
 }
 

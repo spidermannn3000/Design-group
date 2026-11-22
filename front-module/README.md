@@ -2,6 +2,8 @@
 
 Firmware for the handlebar unit: an **ESP32** with a **0.96" 128x64 SSD1306 OLED** over I2C. It runs **on the ESP32**.
 
+Buy the **Blue** or **White** version of the OLED. On the Yellow Blue version, the top 16 rows can only ever show yellow, so the top of every arrow would be yellow.
+
 It receives navigation from the phone over Bluetooth LE and shows the turn arrow, the distance and what to do. The screen flashes when the turn is 5 m away. Every screen is drawn exactly as the phone app's preview shows it; see the pictures in [`docs/images/oled_screens.png`](../docs/images/oled_screens.png).
 
 ## Wiring

@@ -54,7 +54,7 @@ void main() {
     ]) {
       final left = arrowPixels(renderOled(turn(l, 50)));
       final mirrored = {
-        for (final (x, y) in arrowPixels(renderOled(turn(r, 50)))) (57 - x, y)
+        for (final (x, y) in arrowPixels(renderOled(turn(r, 50)))) (56 - x, y)
       };
       final diff =
           left.difference(mirrored).length + mirrored.difference(left).length;
