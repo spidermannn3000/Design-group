@@ -11,7 +11,7 @@ import '../widgets/route_map.dart';
 import 'ride_screen.dart';
 
 /// Destination entry (P3): search for a place or long-press the map, preview
-/// the cycling route, pick the display level and start the ride.
+/// the cycling route and start the ride.
 class DestinationScreen extends StatefulWidget {
   final FrontModule frontModule;
   const DestinationScreen({super.key, required this.frontModule});
@@ -33,7 +33,6 @@ class _DestinationScreenState extends State<DestinationScreen> {
   NavRoute? _preview;
   bool _loadingRoute = false;
   String? _message;
-  TriggerMode _mode = TriggerMode.distance;
 
   @override
   void initState() {
@@ -101,9 +100,9 @@ class _DestinationScreenState extends State<DestinationScreen> {
         start: _here,
         destination: dest.position,
         destinationLabel: dest.label,
-        config: NavConfig(mode: _mode),
+        // Always show the next turn and how far away it is.
+        config: const NavConfig(mode: TriggerMode.always),
         routeProvider: _ors.route,
-        prepareRoute: _mode == TriggerMode.junction ? (r) => addJunctions(r).then((_) {}) : null,
         frontModule: widget.frontModule,
         simulate: simulate,
       ),
@@ -190,25 +189,6 @@ class _DestinationScreenState extends State<DestinationScreen> {
                                       '${(_preview!.durationS / 60).round()} min · '
                                       '${_preview!.manoeuvres.length} turns',
                           style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 12),
-                        SegmentedButton<TriggerMode>(
-                          segments: const [
-                            ButtonSegment(value: TriggerMode.always, label: Text('Level 1')),
-                            ButtonSegment(value: TriggerMode.distance, label: Text('Level 2')),
-                            ButtonSegment(value: TriggerMode.junction, label: Text('Level 3')),
-                          ],
-                          selected: {_mode},
-                          onSelectionChanged: (s) => setState(() => _mode = s.first),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          switch (_mode) {
-                            TriggerMode.always => 'Always show the next turn',
-                            TriggerMode.distance => 'Show each turn from 100 m before it',
-                            TriggerMode.junction => 'Show each turn after the last side road before it',
-                          },
-                          style: theme.textTheme.bodySmall,
                         ),
                         const SizedBox(height: 12),
                         Row(
